@@ -33,10 +33,6 @@ impl<'a> MigrationCommand<'a> for ApplyMigrationCommand<'a> {
             _ => self.handle_normal_migration(&engine),
         }
     }
-
-    fn underlying_database_must_exist() -> bool {
-        true
-    }
 }
 
 impl<'a> ApplyMigrationCommand<'a> {

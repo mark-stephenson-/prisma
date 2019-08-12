@@ -210,7 +210,9 @@ impl MigrationConnector for SqlMigrationConnector {
                     .expect("Creation of Mysql Schema failed");
             }
         }
+
         self.migration_persistence.init();
+
         Ok(())
     }
 

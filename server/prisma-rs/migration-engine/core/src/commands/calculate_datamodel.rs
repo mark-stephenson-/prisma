@@ -24,13 +24,10 @@ impl<'a> MigrationCommand<'a> for CalculateDatamodelCommand<'a> {
 
         let base_datamodel = Datamodel::empty();
         let datamodel = engine.datamodel_calculator().infer(&base_datamodel, &self.input.steps);
+
         Ok(CalculateDatamodelOutput {
             datamodel: datamodel::render(&datamodel).unwrap(),
         })
-    }
-
-    fn has_source_config() -> bool {
-        false
     }
 }
 

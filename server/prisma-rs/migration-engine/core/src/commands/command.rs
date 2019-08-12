@@ -15,20 +15,6 @@ pub trait MigrationCommand<'a> {
     where
         C: MigrationConnector<DatabaseMigration = D>,
         D: DatabaseMigrationMarker + 'static;
-
-    fn has_source_config() -> bool {
-        true
-    }
-
-    fn underlying_database_must_exist() -> bool {
-        false
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SourceConfigInput {
-    pub source_config: String,
 }
 
 pub type CommandResult<T> = Result<T, CommandError>;

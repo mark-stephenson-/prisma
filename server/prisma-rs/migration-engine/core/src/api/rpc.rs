@@ -8,6 +8,7 @@ use jsonrpc_core;
 use jsonrpc_core::types::error::Error as JsonRpcError;
 use jsonrpc_core::IoHandler;
 use jsonrpc_core::*;
+use jsonrpc_stdio_server::ServerBuilder;
 use sql_migration_connector::SqlMigrationConnector;
 use std::{io, sync::Arc};
 use tokio_threadpool::blocking;
@@ -45,8 +46,8 @@ impl RpcCommand {
 }
 
 impl RpcApi {
-    pub fn new(config: &str) -> crate::Result<RpcApi> {
-        let config = datamodel::load_configuration(config)?;
+    pub fn new(datamodel: &str) -> crate::Result<RpcApi> {
+        let config = datamodel::load_configuration(datamodel)?;
 
         let source = config.datasources.first().ok_or(CommandError::DataModelErrors {
             code: 1000,
@@ -78,6 +79,12 @@ impl RpcApi {
         Ok(rpc_api)
     }
 
+    /// Block the thread and handle IO in async until EOF.
+    pub fn start_server(self) {
+        ServerBuilder::new(self.io_handler).build()
+    }
+
+    /// Handle one request
     pub fn handle(&self) -> crate::Result<String> {
         let mut json_is_complete = false;
         let mut input = String::new();
@@ -116,48 +123,47 @@ impl RpcApi {
                     let response_json = match cmd {
                         RpcCommand::InferMigrationSteps => {
                             let input: InferMigrationStepsInput = params.clone().parse()?;
-                            let result = executor.infer_migration_steps(&input).map_err(convert_error)?;
+                            let result = executor.infer_migration_steps(&input)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::ListMigrations => {
-                            let input: ListMigrationStepsInput = params.clone().parse()?;
-                            let result = executor.list_migrations(&input).map_err(convert_error)?;
+                            let result = executor.list_migrations(&serde_json::Value::Null)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::MigrationProgress => {
                             let input: MigrationProgressInput = params.clone().parse()?;
-                            let result = executor.migration_progress(&input).map_err(convert_error)?;
+                            let result = executor.migration_progress(&input)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::ApplyMigration => {
                             let input: ApplyMigrationInput = params.clone().parse()?;
-                            let result = executor.apply_migration(&input).map_err(convert_error)?;
+                            let result = executor.apply_migration(&input)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::UnapplyMigration => {
                             let input: UnapplyMigrationInput = params.clone().parse()?;
-                            let result = executor.unapply_migration(&input).map_err(convert_error)?;
+                            let result = executor.unapply_migration(&input)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::Reset => {
-                            let result = executor.reset(&serde_json::Value::Null).map_err(convert_error)?;
+                            let result = executor.reset(&serde_json::Value::Null)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::CalculateDatamodel => {
                             let input: CalculateDatamodelInput = params.clone().parse()?;
-                            let result = executor.calculate_datamodel(&input).map_err(convert_error)?;
+                            let result = executor.calculate_datamodel(&input)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
                         RpcCommand::CalculateDatabaseSteps => {
                             let input: CalculateDatabaseStepsInput = params.clone().parse()?;
-                            let result = executor.calculate_database_steps(&input).map_err(convert_error)?;
+                            let result = executor.calculate_database_steps(&input)?;
 
                             serde_json::to_value(result).expect("Rendering of RPC response failed")
                         }
@@ -166,25 +172,32 @@ impl RpcApi {
                     Ok(response_json)
                 })
             })
-        }).then(|res| match res {
+        })
+        .then(|res| match res {
+            // dumdidum futures 0.1 we love <3
             Ok(Ok(val)) => ok(val),
             Ok(Err(val)) => err(val),
-            Err(val) => panic!(val)
+            Err(val) => panic!(val), // When the threadpool is full of work, why not just die...
         })
     }
 }
 
-fn convert_error(error: crate::error::Error) -> JsonRpcError {
-    match error {
-        crate::error::Error::CommandError(command_error) => {
-            let json = serde_json::to_value(command_error).expect("rendering the errors as json failed.");
+impl From<crate::error::Error> for JsonRpcError {
+    fn from(error: crate::error::Error) -> Self {
+        match error {
+            crate::error::Error::CommandError(command_error) => {
+                let json = serde_json::to_value(command_error).unwrap();
 
-            JsonRpcError {
-                code: jsonrpc_core::types::error::ErrorCode::ServerError(4466),
-                message: "An error happened. Check the data field for details.".to_string(),
-                data: Some(json),
+                JsonRpcError {
+                    code: jsonrpc_core::types::error::ErrorCode::ServerError(4466),
+                    message: "An error happened. Check the data field for details.".to_string(),
+                    data: Some(json),
+                }
             }
+            err => panic!(
+                "An unexpected error happened. Maybe we should build a handler for these kind of errors? {:?}",
+                err
+            ),
         }
-        _ => unimplemented!(),
     }
 }

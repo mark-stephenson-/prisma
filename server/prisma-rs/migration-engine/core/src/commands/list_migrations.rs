@@ -6,7 +6,7 @@ use migration_connector::*;
 pub struct ListMigrationStepsCommand;
 
 impl<'a> MigrationCommand<'a> for ListMigrationStepsCommand {
-    type Input = ListMigrationStepsInput;
+    type Input = serde_json::Value;
     type Output = Vec<ListMigrationStepsOutput>;
 
     fn new(_: &'a Self::Input) -> Box<Self> {
@@ -50,12 +50,6 @@ where
         status: migration.status,
         datamodel: engine.render_datamodel(&migration.datamodel),
     })
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListMigrationStepsInput {
-    pub source_config: String,
 }
 
 #[derive(Debug, Serialize)]

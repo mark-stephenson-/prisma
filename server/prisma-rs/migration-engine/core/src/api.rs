@@ -40,7 +40,7 @@ pub trait GenericApi: Send + Sync + 'static {
     fn calculate_database_steps(&self, input: &CalculateDatabaseStepsInput) -> crate::Result<MigrationStepsResultOutput>;
     fn calculate_datamodel(&self, input: &CalculateDatamodelInput) -> crate::Result<CalculateDatamodelOutput>;
     fn infer_migration_steps(&self, input: &InferMigrationStepsInput) -> crate::Result<MigrationStepsResultOutput>;
-    fn list_migrations(&self, input: &ListMigrationStepsInput) -> crate::Result<Vec<ListMigrationStepsOutput>>;
+    fn list_migrations(&self, input: &serde_json::Value) -> crate::Result<Vec<ListMigrationStepsOutput>>;
     fn migration_progress(&self, input: &MigrationProgressInput) -> crate::Result<MigrationProgressOutput>;
     fn reset(&self, input: &serde_json::Value) -> crate::Result<serde_json::Value>;
     fn unapply_migration(&self, input: &UnapplyMigrationInput) -> crate::Result<UnapplyMigrationOutput>;
@@ -67,7 +67,7 @@ where
         self.handle_command::<InferMigrationStepsCommand>(input)
     }
 
-    fn list_migrations(&self, input: &ListMigrationStepsInput) -> crate::Result<Vec<ListMigrationStepsOutput>> {
+    fn list_migrations(&self, input: &serde_json::Value) -> crate::Result<Vec<ListMigrationStepsOutput>> {
         self.handle_command::<ListMigrationStepsCommand>(input)
     }
 

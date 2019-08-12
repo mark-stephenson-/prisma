@@ -22,12 +22,4 @@ impl<'a> MigrationCommand<'a> for ResetCommand {
 
         Ok(json!({}))
     }
-
-    fn has_source_config() -> bool {
-        true
-    }
-
-    fn underlying_database_must_exist() -> bool {
-        true
-    }
 }

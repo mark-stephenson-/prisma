@@ -1,4 +1,5 @@
 use datamodel;
+use migration_connector::*;
 use migration_core::{parse_datamodel, MigrationEngine};
 use sql_migration_connector::database_inspector::*;
 use sql_migration_connector::migration_database::{MigrationDatabase, Sqlite};
@@ -12,62 +13,87 @@ pub fn parse(datamodel_string: &str) -> datamodel::Datamodel {
     parse_datamodel(datamodel_string).unwrap()
 }
 
-pub fn test_each_connector<TestFn>(testFn: TestFn)
+pub fn test_each_connector<F, C, D>(test_fn: F)
 where
-    TestFn: Fn(SqlFamily, &MigrationEngine) -> () + std::panic::RefUnwindSafe,
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+    F: Fn(SqlFamily, &MigrationEngine<C, D>) -> () + std::panic::RefUnwindSafe,
 {
-    test_each_connector_with_ignores(Vec::new(), testFn);
+    test_each_connector_with_ignores(Vec::new(), test_fn);
 }
 
-pub fn test_only_connector<TestFn>(sql_family: SqlFamily, testFn: TestFn)
+pub fn test_only_connector<F, C, D>(sql_family: SqlFamily, test_fn: F)
 where
-    TestFn: Fn(SqlFamily, &MigrationEngine) -> () + std::panic::RefUnwindSafe,
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+    F: Fn(SqlFamily, &MigrationEngine<C, D>) -> () + std::panic::RefUnwindSafe,
 {
     let all = vec![SqlFamily::Postgres, SqlFamily::Mysql, SqlFamily::Sqlite];
     let ignores = all.into_iter().filter(|f| f != &sql_family).collect();
-    test_each_connector_with_ignores(ignores, testFn);
+    test_each_connector_with_ignores(ignores, test_fn);
 }
 
-pub fn test_each_connector_with_ignores<TestFn>(ignores: Vec<SqlFamily>, testFn: TestFn)
+pub fn test_each_connector_with_ignores<F, C, D>(ignores: Vec<SqlFamily>, test_fn: F)
 where
-    TestFn: Fn(SqlFamily, &MigrationEngine) -> () + std::panic::RefUnwindSafe,
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+    F: Fn(SqlFamily, &MigrationEngine<C, D>) -> () + std::panic::RefUnwindSafe,
 {
     // SQLite
     if !ignores.contains(&SqlFamily::Sqlite) {
         println!("Testing with SQLite now");
-        let engine = test_engine(&sqlite_test_config());
-        testFn(SqlFamily::Sqlite, &engine);
+
+        let config = sqlite_test_config();
+        let engine = test_engine(&config.url());
+
+        test_fn(SqlFamily::Sqlite, &engine);
     } else {
         println!("Ignoring SQLite")
     }
+
     // POSTGRES
     if !ignores.contains(&SqlFamily::Postgres) {
         println!("Testing with Postgres now");
-        let engine = test_engine(&postgres_test_config());
-        testFn(SqlFamily::Postgres, &engine);
+
+        let config = postgres_test_config();
+        let engine = test_engine(&config.url());
+
+        test_fn(SqlFamily::Postgres, &engine);
     } else {
         println!("Ignoring Postgres")
     }
+
     // MYSQL
     if !ignores.contains(&SqlFamily::Mysql) {
         println!("Testing with MySQL now");
+
         let engine = test_engine(&mysql_test_config());
         println!("ENGINE DONE");
-        testFn(SqlFamily::Mysql, &engine);
+
+        test_fn(SqlFamily::Mysql, &engine);
     } else {
         println!("Ignoring MySQL")
     }
 }
 
-pub fn test_engine(config: &str) -> Box<MigrationEngine> {
-    let underlying_db_must_exist = true;
-    let engine = MigrationEngine::new(config, underlying_db_must_exist);
+pub fn test_engine<C, D>(connector: C) -> MigrationEngine<C, D>
+where
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+{
+    let engine = MigrationEngine::new(connector).unwrap();
+
     engine.reset().expect("Engine reset failed.");
     engine.init().expect("Engine init failed");
+
     engine
 }
 
-pub fn introspect_database(engine: &MigrationEngine) -> DatabaseSchema {
+pub fn introspect_database<C, D>(engine: &MigrationEngine<C, D>) -> DatabaseSchema
+where
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+{
     let inspector: Box<DatabaseInspector> = match engine.connector().connector_type() {
         "postgresql" => Box::new(DatabaseInspector::postgres(postgres_url())),
         "sqlite" => Box::new(DatabaseInspector::sqlite(sqlite_test_file())),
