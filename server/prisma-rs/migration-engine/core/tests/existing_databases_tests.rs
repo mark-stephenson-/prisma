@@ -292,16 +292,20 @@ fn renaming_a_field_where_the_column_was_already_renamed_must_work() {
     })
 }
 
-fn test_each_backend<TestFn>(testFn: TestFn)
+fn test_each_backend<C, D, F>(testFn: F)
 where
-    TestFn: Fn(&MigrationEngine, &BarrelMigrationExecutor) -> () + std::panic::RefUnwindSafe,
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+    F: Fn(&MigrationEngine<C, D>, &BarrelMigrationExecutor) -> () + std::panic::RefUnwindSafe,
 {
     test_each_backend_with_ignores(Vec::new(), testFn);
 }
 
-fn test_each_backend_with_ignores<TestFn>(ignores: Vec<SqlFamily>, testFn: TestFn)
+fn test_each_backend_with_ignores<C, D, F>(ignores: Vec<SqlFamily>, testFn: F)
 where
-    TestFn: Fn(&MigrationEngine, &BarrelMigrationExecutor) -> () + std::panic::RefUnwindSafe,
+    C: MigrationConnector<DatabaseMigration = D>,
+    D: DatabaseMigrationMarker + 'static,
+    F: Fn(&MigrationEngine<C, D>, &BarrelMigrationExecutor) -> () + std::panic::RefUnwindSafe,
 {
     // SQLite
     if !ignores.contains(&SqlFamily::Sqlite) {

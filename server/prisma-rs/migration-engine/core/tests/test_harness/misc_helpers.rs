@@ -1,10 +1,11 @@
 use datamodel;
 use migration_connector::*;
 use migration_core::{parse_datamodel, MigrationEngine};
-use sql_migration_connector::database_inspector::*;
-use sql_migration_connector::migration_database::{MigrationDatabase, Sqlite};
-use sql_migration_connector::SqlFamily;
-use sql_migration_connector::SqlMigrationConnector;
+use sql_migration_connector::{
+    database_inspector::*,
+    migration_database::{MigrationDatabase, Sqlite},
+    SqlFamily, SqlMigrationConnector,
+};
 use std::sync::Arc;
 
 pub const SCHEMA_NAME: &str = "migration_engine";
@@ -13,40 +14,36 @@ pub fn parse(datamodel_string: &str) -> datamodel::Datamodel {
     parse_datamodel(datamodel_string).unwrap()
 }
 
-pub fn test_each_connector<F, C, D>(test_fn: F)
+pub fn test_each_connector<F>(test_fn: F)
 where
-    C: MigrationConnector<DatabaseMigration = D>,
-    D: DatabaseMigrationMarker + 'static,
-    F: Fn(SqlFamily, &MigrationEngine<C, D>) -> () + std::panic::RefUnwindSafe,
+    F: Fn(SqlFamily, &GenericApi) -> () + std::panic::RefUnwindSafe,
 {
     test_each_connector_with_ignores(Vec::new(), test_fn);
 }
 
-pub fn test_only_connector<F, C, D>(sql_family: SqlFamily, test_fn: F)
+pub fn test_only_connector<F>(sql_family: SqlFamily, test_fn: F)
 where
-    C: MigrationConnector<DatabaseMigration = D>,
-    D: DatabaseMigrationMarker + 'static,
-    F: Fn(SqlFamily, &MigrationEngine<C, D>) -> () + std::panic::RefUnwindSafe,
+    F: Fn(SqlFamily, &GenericApi) -> () + std::panic::RefUnwindSafe,
 {
     let all = vec![SqlFamily::Postgres, SqlFamily::Mysql, SqlFamily::Sqlite];
     let ignores = all.into_iter().filter(|f| f != &sql_family).collect();
+
     test_each_connector_with_ignores(ignores, test_fn);
 }
 
-pub fn test_each_connector_with_ignores<F, C, D>(ignores: Vec<SqlFamily>, test_fn: F)
+pub fn test_each_connector_with_ignores<F>(ignores: Vec<SqlFamily>, test_fn: F)
 where
-    C: MigrationConnector<DatabaseMigration = D>,
-    D: DatabaseMigrationMarker + 'static,
-    F: Fn(SqlFamily, &MigrationEngine<C, D>) -> () + std::panic::RefUnwindSafe,
+    F: Fn(SqlFamily, &GenericApi) -> () + std::panic::RefUnwindSafe,
 {
     // SQLite
     if !ignores.contains(&SqlFamily::Sqlite) {
         println!("Testing with SQLite now");
 
         let config = sqlite_test_config();
-        let engine = test_engine(&config.url());
+        let connector = SqlMigrationConnector::sqlite(&config.url()).unwrap();
+        let api = test_api(connector);
 
-        test_fn(SqlFamily::Sqlite, &engine);
+        test_fn(SqlFamily::Sqlite, &api);
     } else {
         println!("Ignoring SQLite")
     }
@@ -56,9 +53,10 @@ where
         println!("Testing with Postgres now");
 
         let config = postgres_test_config();
-        let engine = test_engine(&config.url());
+        let connector = SqlMigrationConnector::postgres(&config.url()).unwrap();
+        let api = test_api(connector);
 
-        test_fn(SqlFamily::Postgres, &engine);
+        test_fn(SqlFamily::Postgres, &api);
     } else {
         println!("Ignoring Postgres")
     }
@@ -67,26 +65,27 @@ where
     if !ignores.contains(&SqlFamily::Mysql) {
         println!("Testing with MySQL now");
 
-        let engine = test_engine(&mysql_test_config());
+        let config = mysql_test_config();
+        let connector = SqlMigrationConnector::mysql(&config.url()).unwrap();
+        let api = test_api(connector);
+
         println!("ENGINE DONE");
 
-        test_fn(SqlFamily::Mysql, &engine);
+        test_fn(SqlFamily::Mysql, &api);
     } else {
         println!("Ignoring MySQL")
     }
 }
 
-pub fn test_engine<C, D>(connector: C) -> MigrationEngine<C, D>
+pub fn test_api<C, D>(connector: C) -> impl GenericApi
 where
     C: MigrationConnector<DatabaseMigration = D>,
     D: DatabaseMigrationMarker + 'static,
 {
-    let engine = MigrationEngine::new(connector).unwrap();
+    let api = MigrationApi::new(connector).unwrap();
+    api.reset(serde_json::Value::Null).expect("Engine reset failed");
 
-    engine.reset().expect("Engine reset failed.");
-    engine.init().expect("Engine init failed");
-
-    engine
+    api
 }
 
 pub fn introspect_database<C, D>(engine: &MigrationEngine<C, D>) -> DatabaseSchema
