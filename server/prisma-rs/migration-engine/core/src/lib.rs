@@ -10,10 +10,7 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate neon;
 
-use api::JavascriptApiExport;
 use commands::*;
 use datamodel::{self, Datamodel};
 
@@ -26,5 +23,3 @@ pub fn parse_datamodel(datamodel: &str) -> CommandResult<Datamodel> {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-register_module!(mut m, { m.export_class::<JavascriptApiExport>("MigrationEngine") });

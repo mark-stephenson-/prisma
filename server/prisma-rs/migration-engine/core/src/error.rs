@@ -13,6 +13,9 @@ pub enum Error {
 
     #[fail(display = "Error in datamodel: {:?}", _0)]
     DatamodelError(ErrorCollection),
+
+    #[fail(display = "Error performing IO: {:?}", _0)]
+    IOError(Schwerror),
 }
 
 impl From<SqlError> for Error {
@@ -30,5 +33,11 @@ impl From<CommandError> for Error {
 impl From<ErrorCollection> for Error {
     fn from(e: ErrorCollection) -> Self {
         Error::DatamodelError(e)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IOError(e.into())
     }
 }

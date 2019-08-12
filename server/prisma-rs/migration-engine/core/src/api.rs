@@ -1,6 +1,6 @@
-mod javascript;
+mod rpc;
 
-pub use javascript::*;
+pub use rpc::*;
 
 use crate::{commands::*, migration_engine::MigrationEngine};
 use migration_connector::*;
