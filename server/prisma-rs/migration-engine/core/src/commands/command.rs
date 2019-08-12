@@ -30,6 +30,9 @@ pub enum CommandError {
 
     #[fail(display = "Generic error. (code: {}, error: {})", code, error)]
     Generic { code: i64, error: String },
+
+    #[fail(display = "Error in command input. (code: {}, error: {})", code, error)]
+    Input { code: i64, error: String }
 }
 
 impl From<datamodel::errors::ErrorCollection> for CommandError {
