@@ -43,7 +43,7 @@ pub struct SqlMigrationConnector {
     pub database_inspector: Arc<dyn DatabaseInspector + Send + Sync + 'static>,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SqlFamily {
     Sqlite,
     Postgres,

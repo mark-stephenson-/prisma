@@ -177,7 +177,10 @@ impl RpcApi {
             // dumdidum futures 0.1 we love <3
             Ok(Ok(val)) => ok(val),
             Ok(Err(val)) => err(val),
-            Err(val) => panic!(val), // When the threadpool is full of work, why not just die...
+            Err(val) => {
+                println!("Fishy stuff...");
+                panic!(val)
+            }, // When the threadpool is full of work, why not just die...
         })
     }
 }

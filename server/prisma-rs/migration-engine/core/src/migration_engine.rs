@@ -27,6 +27,8 @@ where
             connector,
         };
 
+        engine.init()?;
+
         Ok(engine)
     }
 

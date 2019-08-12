@@ -2,6 +2,7 @@ use failure::{Error as Schwerror, Fail};
 use sql_migration_connector::SqlError;
 use crate::commands::CommandError;
 use datamodel::errors::ErrorCollection;
+use tokio_threadpool::BlockingError;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -16,6 +17,15 @@ pub enum Error {
 
     #[fail(display = "Error performing IO: {:?}", _0)]
     IOError(Schwerror),
+
+    #[fail(display = "Threadpool error: {:?}", _0)]
+    BlockingError(BlockingError),
+}
+
+impl From<BlockingError> for Error {
+    fn from(e: BlockingError) -> Self {
+        Error::BlockingError(e)
+    }
 }
 
 impl From<SqlError> for Error {
