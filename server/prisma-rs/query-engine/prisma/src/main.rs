@@ -77,14 +77,14 @@ fn main() {
                         .required(false),
                 )
                 .arg(
-                    Arg::with_name("DMMF")
+                    Arg::with_name("dmmf_to_dml")
                         .long("dmmf_to_dml")
                         .help("Convert the DMMF to a data model")
                         .takes_value(true)
                         .required(false),
                 )
                 .arg(
-                    Arg::with_name("DATAMODEL")
+                    Arg::with_name("get_config")
                         .long("get_config")
                         .help("Get the configuration from the given data model")
                         .takes_value(true)
