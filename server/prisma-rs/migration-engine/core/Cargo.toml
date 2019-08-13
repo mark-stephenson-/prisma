@@ -29,6 +29,7 @@ jsonrpc-stdio-server = "13.0"
 futures = "0.1"
 tokio = "0.1"
 tokio-threadpool = "0.1"
+lazy_static = "1.3"
 
 [dev-dependencies]
 prisma-query = { git = "https://github.com/prisma/prisma-query.git" }

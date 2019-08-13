@@ -9,8 +9,48 @@ use prisma_query::connector::{MysqlParams, PostgresParams};
 use sql_migration_connector::{database_inspector::*, migration_database::*, SqlFamily, SqlMigrationConnector};
 use std::convert::TryFrom;
 use url::Url;
+use lazy_static::lazy_static;
 
 pub const SCHEMA_NAME: &str = "migration_engine";
+
+lazy_static! {
+    static ref SQLITE_API: Box<dyn GenericApi> = {
+        let server_root = std::env::var("SERVER_ROOT").expect("Env var SERVER_ROOT required but not found.");
+        let database_folder_path = format!("{}/db", server_root);
+        let file_path = format!("{}/{}.db", database_folder_path, SCHEMA_NAME);
+
+        let connector = SqlMigrationConnector::sqlite(&file_path).unwrap();
+        Box::new(MigrationApi::new(connector).unwrap())
+    };
+
+    static ref POSTGRES_API: Box<dyn GenericApi> = {
+        let host = match std::env::var("IS_BUILDKITE") {
+            Ok(_) => "test-db-postgres",
+            Err(_) => "127.0.0.1",
+        };
+
+        let url = format!(
+            "postgresql://postgres:prisma@{}:5432/db?schema={}",
+            host,
+            SCHEMA_NAME
+        );
+
+        let connector = SqlMigrationConnector::postgres(&url).unwrap();
+        Box::new(MigrationApi::new(connector).unwrap())
+    };
+
+    static ref MYSQL_API: Box<dyn GenericApi> = {
+        let host = match std::env::var("IS_BUILDKITE") {
+            Ok(_) => "test-db-mysql",
+            Err(_) => "127.0.0.1",
+        };
+
+        let url = format!("mysql://root:prisma@{}:3306/{}", host, SCHEMA_NAME);
+        let connector = SqlMigrationConnector::mysql(&url).unwrap();
+
+        Box::new(MigrationApi::new(connector).unwrap())
+    };
+}
 
 pub fn parse(datamodel_string: &str) -> datamodel::Datamodel {
     parse_datamodel(datamodel_string).unwrap()
@@ -41,10 +81,9 @@ where
     if !ignores.contains(&SqlFamily::Sqlite) {
         println!("Testing with SQLite now");
 
-        let connector = SqlMigrationConnector::sqlite(&sqlite_test_file()).unwrap();
-        let api = test_api(connector);
+        SQLITE_API.reset(&serde_json::Value::Null).unwrap();
 
-        test_fn(SqlFamily::Sqlite, &api);
+        test_fn(SqlFamily::Sqlite, &**SQLITE_API);
     } else {
         println!("Ignoring SQLite")
     }
@@ -53,10 +92,9 @@ where
     if !ignores.contains(&SqlFamily::Postgres) {
         println!("Testing with Postgres now");
 
-        let connector = SqlMigrationConnector::postgres(&postgres_url()).unwrap();
-        let api = test_api(connector);
+        POSTGRES_API.reset(&serde_json::Value::Null).unwrap();
 
-        test_fn(SqlFamily::Postgres, &api);
+        test_fn(SqlFamily::Postgres, &**POSTGRES_API);
     } else {
         println!("Ignoring Postgres")
     }
@@ -65,12 +103,9 @@ where
     if !ignores.contains(&SqlFamily::Mysql) {
         println!("Testing with MySQL now");
 
-        let connector = SqlMigrationConnector::mysql(&mysql_url()).unwrap();
-        let api = test_api(connector);
+        MYSQL_API.reset(&serde_json::Value::Null).unwrap();
 
-        println!("ENGINE DONE");
-
-        test_fn(SqlFamily::Mysql, &api);
+        test_fn(SqlFamily::Mysql, &**MYSQL_API);
     } else {
         println!("Ignoring MySQL")
     }
@@ -81,10 +116,7 @@ where
     C: MigrationConnector<DatabaseMigration = D>,
     D: DatabaseMigrationMarker + Send + Sync + 'static,
 {
-    let api = match MigrationApi::new(connector) {
-        Ok(api) => api,
-        Err(e) => panic!(dbg!(e)),
-    };
+    let api = MigrationApi::new(connector).unwrap();
 
     api.handle_command::<ResetCommand>(&serde_json::Value::Null)
         .expect("Engine reset failed");
