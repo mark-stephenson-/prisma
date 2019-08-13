@@ -4,6 +4,7 @@ pub use rpc::*;
 
 use crate::{commands::*, migration_engine::MigrationEngine};
 use migration_connector::*;
+use std::sync::Arc;
 
 pub struct MigrationApi<C, D>
 where
@@ -44,6 +45,8 @@ pub trait GenericApi: Send + Sync + 'static {
     fn migration_progress(&self, input: &MigrationProgressInput) -> crate::Result<MigrationProgressOutput>;
     fn reset(&self, input: &serde_json::Value) -> crate::Result<serde_json::Value>;
     fn unapply_migration(&self, input: &UnapplyMigrationInput) -> crate::Result<UnapplyMigrationOutput>;
+    fn migration_persistence(&self) -> Arc<dyn MigrationPersistence>;
+    fn connector_type(&self) -> &'static str;
 }
 
 impl<C, D> GenericApi for MigrationApi<C, D>
@@ -81,5 +84,13 @@ where
 
     fn unapply_migration(&self, input: &UnapplyMigrationInput) -> crate::Result<UnapplyMigrationOutput> {
         self.handle_command::<UnapplyMigrationCommand>(input)
+    }
+
+    fn migration_persistence(&self) -> Arc<dyn MigrationPersistence> {
+        self.engine.connector().migration_persistence()
+    }
+
+    fn connector_type(&self) -> &'static str {
+        self.engine.connector().connector_type()
     }
 }

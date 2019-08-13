@@ -79,7 +79,7 @@ pub struct PostgreSql {
 
 impl PostgreSql {
     pub fn new(params: PostgresParams) -> prisma_query::Result<Self> {
-        let pool = r2d2::Pool::try_from(params).unwrap();
+        let pool = r2d2::Pool::try_from(params)?;
         Ok(Self { pool })
     }
 

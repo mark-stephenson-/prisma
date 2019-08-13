@@ -1,13 +1,13 @@
 use super::introspect_database;
 use migration_connector::*;
-use migration_core::{api::GenericApi, commands::*, MigrationEngine};
+use migration_core::{api::GenericApi, commands::*};
 use sql_migration_connector::database_inspector::*;
 
-pub fn infer_and_apply(api: &GenericApi, datamodel: &str) -> DatabaseSchema {
+pub fn infer_and_apply(api: &dyn GenericApi, datamodel: &str) -> DatabaseSchema {
     infer_and_apply_with_migration_id(api, &datamodel, "the-migration-id")
 }
 
-pub fn infer_and_apply_with_migration_id(api: &GenericApi, datamodel: &str, migration_id: &str) -> DatabaseSchema {
+pub fn infer_and_apply_with_migration_id(api: &dyn GenericApi, datamodel: &str, migration_id: &str) -> DatabaseSchema {
     let input = InferMigrationStepsInput {
         migration_id: migration_id.to_string(),
         datamodel: datamodel.to_string(),
@@ -19,7 +19,7 @@ pub fn infer_and_apply_with_migration_id(api: &GenericApi, datamodel: &str, migr
     apply_migration(api, steps, migration_id)
 }
 
-pub fn run_infer_command(api: &GenericApi, input: InferMigrationStepsInput) -> Vec<MigrationStep> {
+pub fn run_infer_command(api: &dyn GenericApi, input: InferMigrationStepsInput) -> Vec<MigrationStep> {
     let output = api.infer_migration_steps(&input).expect("InferMigration failed");
 
     assert!(
@@ -30,7 +30,7 @@ pub fn run_infer_command(api: &GenericApi, input: InferMigrationStepsInput) -> V
     output.datamodel_steps
 }
 
-pub fn apply_migration(api: &GenericApi, steps: Vec<MigrationStep>, migration_id: &str) -> DatabaseSchema {
+pub fn apply_migration(api: &dyn GenericApi, steps: Vec<MigrationStep>, migration_id: &str) -> DatabaseSchema {
     let input = ApplyMigrationInput {
         migration_id: migration_id.to_string(),
         steps: steps,
@@ -44,13 +44,13 @@ pub fn apply_migration(api: &GenericApi, steps: Vec<MigrationStep>, migration_id
         format!("ApplyMigration returned unexpected errors: {:?}", output.general_errors)
     );
 
-    introspect_database(&engine)
+    introspect_database(api)
 }
 
-pub fn unapply_migration(api: &GenericApi) -> DatabaseSchema
+pub fn unapply_migration(api: &dyn GenericApi) -> DatabaseSchema
 {
     let input = UnapplyMigrationInput {};
     let _ = api.unapply_migration(&input);
 
-    introspect_database(&engine)
+    introspect_database(api)
 }

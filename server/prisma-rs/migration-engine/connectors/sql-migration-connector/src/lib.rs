@@ -64,19 +64,22 @@ impl SqlMigrationConnector {
     pub fn postgres(url: &str) -> crate::Result<Self> {
         let url = Url::parse(url)?;
         let params = PostgresParams::try_from(url.clone())?;
+
+        let dbname = params.dbname.clone();
         let schema = params.schema.clone();
 
         match PostgreSql::new(params) {
-            Ok(conn) => Ok(Self::create_connector(Arc::new(conn), SqlFamily::Mysql, schema, None)),
-            Err(prisma_query::error::Error::QueryError(_)) => {
+            Ok(conn) => {
+                Ok(Self::create_connector(Arc::new(conn), SqlFamily::Postgres, schema, None))
+            }
+            Err(prisma_query::error::Error::ConnectionError(_)) => {
                 let _ = {
                     let mut url = url.clone();
                     url.set_path("postgres");
 
                     let params = PostgresParams::try_from(url)?;
-                    let dbname = params.dbname.clone();
-
                     let connection = PostgreSql::new(params)?;
+
                     let db_sql = format!("CREATE DATABASE \"{}\";", dbname);
 
                     connection.query_raw("", &db_sql, &[]) // ignoring errors as there's no CREATE DATABASE IF NOT EXISTS in Postgres
@@ -93,7 +96,9 @@ impl SqlMigrationConnector {
                     None,
                 ))
             }
-            Err(err) => Err(err.into()),
+            Err(err) => {
+                Err(err.into())
+            }
         }
     }
 
@@ -108,7 +113,7 @@ impl SqlMigrationConnector {
     }
 
     pub fn sqlite(url: &str) -> crate::Result<Self> {
-        let conn = Sqlite::new(url).unwrap();
+        let conn = Sqlite::new(url)?;
         let file_path = conn.file_path.clone();
         let schema = String::from("lift");
 
@@ -193,9 +198,7 @@ impl MigrationConnector for SqlMigrationConnector {
 
                 debug!("{}", schema_sql);
 
-                self.database
-                    .query_raw("", &schema_sql, &[])
-                    .expect("Creation of Postgres Schema failed");
+                self.database.query_raw("", &schema_sql, &[])?;
             }
             SqlFamily::Mysql => {
                 let schema_sql = format!(
@@ -205,9 +208,7 @@ impl MigrationConnector for SqlMigrationConnector {
 
                 debug!("{}", schema_sql);
 
-                self.database
-                    .query_raw("", &schema_sql, &[])
-                    .expect("Creation of Mysql Schema failed");
+                self.database.query_raw("", &schema_sql, &[])?;
             }
         }
 

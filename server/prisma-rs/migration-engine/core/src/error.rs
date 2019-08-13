@@ -1,5 +1,6 @@
 use failure::{Error as Schwerror, Fail};
 use sql_migration_connector::SqlError;
+use migration_connector::ConnectorError;
 use crate::commands::CommandError;
 use datamodel::errors::ErrorCollection;
 use tokio_threadpool::BlockingError;
@@ -30,6 +31,12 @@ impl From<BlockingError> for Error {
 
 impl From<SqlError> for Error {
     fn from(e: SqlError) -> Self {
+        Error::ConnectorError(e.into())
+    }
+}
+
+impl From<ConnectorError> for Error {
+    fn from(e: ConnectorError) -> Self {
         Error::ConnectorError(e.into())
     }
 }
